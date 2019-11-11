@@ -1,0 +1,280 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <time.h>
+#include <string>
+#include <filesystem> // C++17
+namespace fs = std::filesystem;
+using namespace std;
+// https://fr.wikipedia.org/wiki/Probl%C3%A8me_du_voyageur_de_commerce
+// https://interstices.info/le-probleme-du-voyageur-de-commerce/
+
+int factorielle ( int val ) { //https://www.developpez.net/forums/d430474/c-cpp/cpp/codage-cpp-factoriel-d-nombre-entier/
+    int result = 1;
+
+    for ( int i = val; i > 0; --i )
+        result *= i;
+
+    return result;
+    }
+
+void intro ( int nbPoint ) {
+    cout << "0 : Sortir." << endl;
+    cout << "1 : Entrer des points manuellement. Attention : destruction de tous les points initiaux !" << endl;
+    cout << "H : Me laisser choisir des points au pseudo-hasard." << endl;
+    cout << "S : Sauvegarder les points sur le SSD." << endl;
+    //cout << "4 : Lire des points du SSD." << endl;
+    cout << "A : Afficher les points." << endl;
+    /*cout << "F : Trier les points en force brute." << endl;
+    cout << "    ATTENTION !" << endl;
+    cout << "    Pour N points, il y a (1/2)*(N-1)! chemins possibles !" << endl;
+    cout << "    Actuellement il y a " << nbPoint << " points." << endl;
+    cout << "    ce qui fait " << ( factorielle ( nbPoint-1 ) ) *0.5 << " calculs !" << endl;
+    */
+    // cout << "P : Partir du premier point, et aller au suivant plus proche..." << endl;
+    cout << "    Actuellement il y a " << nbPoint << " points." << endl; //
+    cout << "N : Changer le nombre de points. ";
+
+    if ( nbPoint>3 ) {
+        cout << "Attention : destruction des points initiaux \"en trop\" !" << endl;
+        }
+
+    cout << "P : Exporter vers PovRay." << endl;
+    //cout << "8 : Exporter en SVG." << endl;
+    }
+
+bool errBadVAlue ( string texteBadValue, auto min, auto max ) {
+    cerr << "Min = "  << min << endl;
+    cerr << "Max = "  << max << endl;
+    cerr << texteBadValue << endl;
+    return false;
+    }
+
+
+auto inputNb ( auto max = 42, auto min = 0, string texteDemande = "How many?", string texteBadValue = "A good number!" ) { // C++14 minimum.
+    if ( max < min ) { // En général, on donne le minimum avant le maximum, et parfois pas la valeur par défaut.
+        auto temp = max;
+        max = min;
+        min = temp;
+        }
+
+// Textes par défaut par fichier lgg ?
+
+    auto a = max; // Valeur valide.
+    string tentativeString = "";
+    bool inputOk  = true;
+
+    do {
+        cout << texteDemande << endl;
+        inputOk = true; // Pour autre demande éventuelle.
+
+        try {
+            getline ( cin, tentativeString ); // Pour éviter des bugs de non nombre.
+            }
+        catch ( const std::invalid_argument& e ) {
+            cerr << "Standard exception: " << e.what() << endl;
+            inputOk = errBadVAlue ( texteBadValue, min, max );
+            }
+
+        try {
+            a = stoi ( tentativeString ); // cin.;
+            }
+        catch ( exception& e ) {   // Nombre dépassant la limite : 99999999999999999999999999999999 par exemple.
+            cerr << "Standard exception: " << e.what() << endl;
+            inputOk = errBadVAlue ( texteBadValue, min, max );
+            }
+
+        if ( ( a < min ) || ( a > max ) ) {
+            a = max; // Valeur valide.
+            inputOk = errBadVAlue ( texteBadValue, min, max );
+            }
+        }
+    while ( inputOk == false );
+
+    return a;
+    }
+
+
+int FileAppend ( string file = "", string data = "" ) { // And create new file if does not exist. // Slow.
+    ofstream outfile ( file.c_str(), ios_base::app );
+
+    if ( !outfile ) {
+        cerr << "Error Opening File " << file << "!" << endl;
+        return -1; // Err!
+        }
+    else {
+        outfile << data;
+        outfile.close();
+        }
+
+    return 0; // Ok.
+    }
+
+int FileAppend ( string file = "", int dataI = 0 ) { // And create new file if does not exist. // Slow.
+    return FileAppend ( file,  to_string ( dataI ) ) ;
+    }
+
+
+void outtro() {
+    cout << "Au revoir." << endl;
+    }
+
+
+int main() {
+    srand ( time ( NULL ) ); // No need for better init.
+
+    cout << "Le but de cet exercice est de trouver le trajet le plus court reliant tous les points." << endl;
+    cout << "Tous les points sont ici en 2D dans un plan parfait. Le sens n\'a pas d\'importance." << endl;
+    cout << "Le menu se commande en majuscules ou en minuscules." << endl;
+    int nbPoints = 10;
+    vector < vector < int > > Matrix ( 2, vector< int > ( nbPoints,0 ) ); // Matrix refuse de "passer" dans les fonctions en tant que variable globale.
+    char choice='?';
+    string file = "1.txt";
+    int minX=0;
+    int minY=0;
+    int maxX=1;
+    int maxY=1;
+
+    do {
+        intro ( nbPoints );
+        cin >> choice;
+
+        switch ( choice ) {
+            case 'M':
+            case 'm':
+                for ( int p=0; p<Matrix[0].size(); p++ ) {
+                    cout << "Nombre " << p << " : " << endl;
+                    Matrix[0][p] = inputNb ( -100,100,"X ?", "Un bon nombre !" );
+                    Matrix[1][p] = inputNb ( -100,100,"Y ?", "Un bon nombre !" );
+                    }
+
+                break;
+
+            case 'h':
+            case 'H':
+                for ( int p=0; p<Matrix[0].size(); p++ ) {
+                    Matrix[0][p] = rand() % ( 10 * Matrix[0].size() ) + 0;
+                    Matrix[1][p] = rand() % ( 10 * Matrix[0].size() ) + 0;
+                    }
+
+                break;
+
+            case 's':
+            case 'S':
+                cout << "Sauver les points sous quel fichier ? (Avec l\'extention, par exemple \".txt\". Ajout des points en bas du fichier si le fichier existe.) " << endl;
+                cin >> file ;
+
+                for ( int b=0; b<Matrix[0].size(); b++ ) {
+
+                    FileAppend ( file, Matrix[0][b] );  //
+                    FileAppend ( file," , " );
+                    FileAppend ( file, Matrix[1][b] );  //
+                    FileAppend ( file,"\n" );
+                    }
+
+                break;
+
+            case 'n':
+            case 'N':
+                nbPoints = inputNb ( 42, 3, "Combien de points voulez-vous ?", "Une bonne valeur !" );
+                Matrix[0].resize ( nbPoints,0 );
+                Matrix[1].resize ( nbPoints,0 );
+                break;
+
+            case 'p':
+            case 'P':
+                cout << "Sauver les points sous quel fichier ? (sans l\'extention \".pov\". Ajout des points en bas du fichier si le fichier existe.) " << endl;
+                cin >> file ;
+                file = file + ".pov";
+fs::copy("pov.pov",file); //https://docs.w3cub.com/cpp/filesystem/copy/
+
+                for ( int p=0; p<Matrix[0].size(); p++ ) {
+//             "object {city translate<1,0,0> }"
+                    FileAppend ( file,"object {city translate<" );
+                    FileAppend ( file,Matrix[0][p] );
+                    FileAppend ( file,"," );
+                    FileAppend ( file,Matrix[1][p] );
+                    FileAppend ( file,",0> }\n" );
+
+
+                    if ( maxX<Matrix[0][p] ) {
+                        maxX = Matrix[0][p];
+                        }
+
+                    if ( maxY<Matrix[1][p] ) {
+                        maxY = Matrix[1][p];
+                        }
+
+                    if ( minX>Matrix[0][p] ) {
+                        minX = Matrix[0][p];
+                        }
+
+                    if ( minY>Matrix[1][p] ) {
+                        minY = Matrix[1][p];
+                        }
+
+//   cylinder { <2,2,0>,<1,1,0>,diameterRoad texture { textureRoad}}
+                    }
+
+                for ( int p=0; p<Matrix[0].size()-1; p++ ) { // -1 because the last loop on the last city with city0.
+                    FileAppend ( file,"cylinder { <" );
+                    FileAppend ( file,Matrix[0][p] );
+                    FileAppend ( file, "," );
+                    FileAppend ( file,Matrix[1][p] );
+
+                    FileAppend ( file,",0>,<" );
+                    FileAppend ( file,Matrix[0][p+1] );
+                    FileAppend ( file, " ," );
+                    FileAppend ( file,Matrix[1][p+1] );
+                    FileAppend ( file,",0>,diameterRoad texture { textureRoad}}\n" );
+                    }
+
+                FileAppend ( file,"cylinder { <" );
+                FileAppend ( file,Matrix[0][0] );
+                FileAppend ( file,"," );
+                FileAppend ( file,Matrix[1][0] );
+
+                FileAppend ( file,",0>,<" );
+              //  FileAppend ( file,Matrix[0][Matrix[0].size()-1] );
+                FileAppend ( file,Matrix[0][nbPoints-1] );
+                FileAppend ( file, " ," );
+//                FileAppend ( file,Matrix[1][Matrix[0].size()-1] );
+                FileAppend ( file,Matrix[1][nbPoints-1] );
+                FileAppend ( file,",0>,diameterRoad texture { textureRoad}}\n" );
+
+
+                FileAppend ( file,"camera{location <" );
+                FileAppend ( file, ( min ( minX,0 )+maxX ) /2 );
+                FileAppend ( file," ," );
+                FileAppend ( file, ( min ( minY,0 )+maxY ) /2 );
+                FileAppend ( file," ," );
+                FileAppend ( file,- ( 5- min ( minY,minX ) + max ( maxX,maxY ) ) );
+                FileAppend ( file,">}\n" );
+
+
+                break;
+
+            case 'a':
+            case 'A':
+
+//                affiche(Matrix()):
+                for ( int q=0; q<Matrix[0].size(); q++ ) {
+                    cout << Matrix[0][q] << " , " << Matrix[1][q] << endl;
+                    }
+
+                break;
+
+            case '0':
+                break;
+
+            default:
+                cerr << "Quoi ?" << endl;
+                break;
+            }
+        }
+
+    while ( choice != '0' );
+
+    outtro();
+    return 0;
+    }
